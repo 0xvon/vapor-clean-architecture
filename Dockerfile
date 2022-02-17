@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:experimental
 # ================================
 # Build image
 # ================================
@@ -17,24 +18,30 @@ WORKDIR /build
 # as long as your Package.swift/Package.resolved
 # files do not change.
 COPY ./Package.* ./
+COPY ./Modules/Core/Package.* ./Modules/Core/
+COPY ./Modules/DomainEntity/Package.* ./Modules/DomainEntity/
+COPY ./Modules/Endpoint/Package.* ./Modules/Endpoint/
+COPY ./Modules/LoggingDiscord/Package.* ./Modules/LoggingDiscord/
+
 RUN swift package resolve
 
 # Copy entire repo into container
 COPY . .
 
-# Build everything, with optimizations
-RUN swift build -c release
+# Build everything, with optimizations and test discovery
+RUN --mount=type=cache,target=/build/.build \
+  swift build -c release -Xswiftc -g
 
 # Switch to the staging area
 WORKDIR /staging
 
 # Copy main executable to staging area
-RUN cp "$(swift build --package-path /build -c release --show-bin-path)/Run" ./
+RUN --mount=type=cache,target=/build/.build \
+  cp "$(swift build --package-path /build -c release --show-bin-path)/Run" ./
 
-# Copy any resources from the public directory and views directory if the directories exist
+# Uncomment the next line if you need to load resources from the `Public` directory.
 # Ensure that by default, neither the directory nor any of its contents are writable.
-RUN [ -d /build/Public ] && { mv /build/Public ./Public && chmod -R a-w ./Public; } || true
-RUN [ -d /build/Resources ] && { mv /build/Resources ./Resources && chmod -R a-w ./Resources; } || true
+#RUN mv /build/Public ./Public && chmod -R a-w ./Public
 
 # ================================
 # Run image
@@ -57,9 +64,10 @@ COPY --from=build --chown=vapor:vapor /staging /app
 # Ensure all further commands run as the vapor user
 USER vapor:vapor
 
+ENV PORT=8080
 # Let Docker bind to port 8080
-EXPOSE 8080
+EXPOSE $PORT
 
-# Start the Vapor service when the image is run, default to listening on 8080 in production environment
-ENTRYPOINT ["./Run"]
-CMD ["serve", "--env", "production", "--hostname", "0.0.0.0", "--port", "8080"]
+RUN echo "./Run serve --env production --hostname 0.0.0.0 --port \$PORT" > ./entrypoint.sh && \
+  chmod +x ./entrypoint.sh
+ENTRYPOINT "./entrypoint.sh"

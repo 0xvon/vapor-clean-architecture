@@ -1,4 +1,5 @@
 import App
+import Logging
 import Vapor
 
 var env = try Environment.detect()

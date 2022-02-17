@@ -6,4 +6,6 @@ DerivedData/
 .DS_Store
 db.sqlite
 .swiftpm
-
+.env.testing
+.env.development
+Products/Seed/Sources/Seed/.cache.json

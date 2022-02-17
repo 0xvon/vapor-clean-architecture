@@ -1,22 +1,55 @@
+import DomainEntity
 import Fluent
 import FluentMySQLDriver
+import Persistance
 import Vapor
+import JWTKit
+import Foundation
 
-// configures your application
-public func configure(_ app: Application) throws {
-    // uncomment to serve files from /Public folder
-    // app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
+protocol Secrets: DatabaseSecrets {
+}
 
-    app.databases.use(.mysql(
-        hostname: Environment.get("DATABASE_HOST") ?? "localhost",
-        port: Environment.get("DATABASE_PORT").flatMap(Int.init(_:)) ?? MySQLConfiguration.ianaPortNumber,
-        username: Environment.get("DATABASE_USERNAME") ?? "vapor_username",
-        password: Environment.get("DATABASE_PASSWORD") ?? "vapor_password",
-        database: Environment.get("DATABASE_NAME") ?? "vapor_database"
-    ), as: .mysql)
+public struct EnvironmentSecrets: Secrets {
+    public init() {
+        func require(_ key: String) -> String {
+            guard let value = Environment.get(key) else {
+                fatalError("Please set \"\(key)\" environment variable")
+            }
+            return value
+        }
+        self.databaseURL = require("DATABASE_URL")
+    }
+    public let databaseURL: String
+}
 
-    app.migrations.add(CreateTodo())
+extension Application {
+    struct SecretsKey: StorageKey {
+        typealias Value = Secrets
+    }
+    var secrets: Secrets {
+        get {
+            guard let secrets = storage[SecretsKey.self] else {
+                fatalError("Please set app.secrets")
+            }
+            return secrets
+        }
+        set { storage[SecretsKey.self] = newValue }
+    }
+}
 
-    // register routes
+public func configure(
+    _ app: Application,
+    secrets: EnvironmentSecrets = EnvironmentSecrets(),
+    authenticator: Authenticator? = nil
+) throws {
+    app.secrets = secrets
+    try Persistance.setup(
+        databases: app.databases,
+        secrets: secrets
+    )
+    try Persistance.setupMigration(
+        migrator: app.migrator,
+        migrations: app.migrations
+    )
     try routes(app)
 }
