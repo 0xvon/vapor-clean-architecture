@@ -13,7 +13,7 @@ Hello. This is a Vapor 4.5 × Clean Architecture Template.<br>
 ## Get Started
 
 ```
-$ vapor new <project name> --template=masatsch/vapor-clean-architecture
+$ vapor new <project name> --template https://github.com/masatsch/vapor-clean-architecture
 ```
 
 <br>
